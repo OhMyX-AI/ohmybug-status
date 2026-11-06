@@ -1,0 +1,30 @@
+name: probe
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+# One run at a time, so two pushes never race; a queued run waits instead of being dropped.
+concurrency:
+  group: probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node probe.mjs --self-test
+      - run: node probe.mjs
+      - name: Commit when something changed
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add samples.json history.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -q -m "probe $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
